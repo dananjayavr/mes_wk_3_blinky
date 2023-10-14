@@ -2,9 +2,7 @@
 #include "main.h"
 #include "retarget.h"
 
-GPIO_PinState pb_status;
-GPIO_PinState pb_status_previous;
-
+volatile uint8_t pb_status;
 UART_HandleTypeDef huart3;
 
 void Error_Handler(void);
@@ -33,15 +31,12 @@ int main(void)
   /* Infinite loop */
   while (1)
   {
-      pb_status = HAL_GPIO_ReadPin(USER_Btn_GPIO_Port,USER_Btn_Pin);
-
       if(pb_status)
           HAL_GPIO_WritePin(USER_Btn_GPIO_Port,USER_Btn_Pin,GPIO_PIN_RESET);
       else
           HAL_GPIO_TogglePin(LD1_GPIO_Port,LD1_Pin);
 
       HAL_Delay(100);
-
   }
 }
 
@@ -72,7 +67,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLQ = 7;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
-    //Error_Handler();
+    Error_Handler();
   }
 
   /** Initializes the CPU, AHB and APB buses clocks
@@ -134,12 +129,30 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USER_Btn_GPIO_Port, &GPIO_InitStruct);
 
+  // Make the User button IT
+  // Give the User button lowest IT priority
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn,15,0);
+  // Enable the IRQ
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
   /*Configure GPIO pins : LD1_Pin LD3_Pin LD2_Pin */
   GPIO_InitStruct.Pin = LD1_Pin|LD3_Pin|LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+}
+
+/**
+  * @brief  EXTI line detection callbacks.
+  * @param  GPIO_Pin Specifies the pins connected EXTI line
+  * @retval None
+  */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if(GPIO_Pin == GPIO_PIN_13) {
+        pb_status ^= 1;
+    }
 }
 
 /**
@@ -152,6 +165,7 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+      // IMPLEMENT ME!
   }
 }
 

@@ -11,6 +11,7 @@ void NMI_Handler(void)
 {
   while (1)
   {
+      // IMPLEMENT ME!
   }
 }
 
@@ -21,6 +22,7 @@ void HardFault_Handler(void)
 {
   while (1)
   {
+      // IMPLEMENT ME!
   }
 }
 
@@ -31,6 +33,7 @@ void MemManage_Handler(void)
 {
   while (1)
   {
+      // IMPLEMENT ME!
   }
 }
 
@@ -41,6 +44,7 @@ void BusFault_Handler(void)
 {
   while (1)
   {
+      // IMPLEMENT ME!
   }
 }
 
@@ -51,6 +55,7 @@ void UsageFault_Handler(void)
 {
   while (1)
   {
+      // IMPLEMENT ME!
   }
 }
 
@@ -59,6 +64,7 @@ void UsageFault_Handler(void)
   */
 void SVC_Handler(void)
 {
+    // IMPLEMENT ME!
 }
 
 /**
@@ -66,6 +72,7 @@ void SVC_Handler(void)
   */
 void DebugMon_Handler(void)
 {
+    // IMPLEMENT ME!
 }
 
 /**
@@ -73,6 +80,7 @@ void DebugMon_Handler(void)
   */
 void PendSV_Handler(void)
 {
+    // IMPLEMENT ME!
 }
 
 /**
@@ -89,5 +97,7 @@ void SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32f4xx.s).                    */
 /******************************************************************************/
-
+void EXTI15_10_IRQHandler(void) {
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_13);
+}
 
