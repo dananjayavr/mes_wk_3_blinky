@@ -150,9 +150,12 @@ static void MX_GPIO_Init(void)
   */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
+    // Making sure interrupt is coming from the GPIO_PIN_13 (our push button)
     if(GPIO_Pin == GPIO_PIN_13) {
-        pb_status ^= 1;
+        pb_status ^= 1; // Toggle the push button status flag
     }
+
+    HAL_GPIO_WritePin(LD1_GPIO_Port,LD1_Pin,GPIO_PIN_RESET);
 }
 
 /**
