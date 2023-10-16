@@ -1,6 +1,8 @@
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_it.h"
 
+extern TIM_HandleTypeDef htim2;
+
 /******************************************************************************/
 /*           Cortex-M4 Processor Interruption and Exception Handlers          */
 /******************************************************************************/
@@ -101,3 +103,10 @@ void EXTI15_10_IRQHandler(void) {
     HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_13);
 }
 
+/**
+  * @brief This function handles TIM2 global interrupt.
+  */
+void TIM2_IRQHandler(void)
+{
+    HAL_TIM_IRQHandler(&htim2);
+}

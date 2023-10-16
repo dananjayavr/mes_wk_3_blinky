@@ -2,13 +2,55 @@
 #include "main.h"
 #include "retarget.h"
 
-volatile uint8_t pb_status;
+volatile uint8_t pb_state; // hold push button state
+volatile uint8_t pb_toggle; // hold toggled push button state
+
 UART_HandleTypeDef huart3;
+TIM_HandleTypeDef htim2;
 
 void Error_Handler(void);
 void SystemClock_Config(void);
+
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_TIM2_Init(void);
+
+/**
+  * @brief  EXTI line detection callbacks.
+  * @param  GPIO_Pin Specifies the pins connected EXTI line
+  * @retval None
+  */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    // Making sure interrupt is coming from the GPIO_PIN_13 (our push button)
+    if(GPIO_Pin == USER_Btn_Pin) {
+        pb_state = 1;
+        HAL_TIM_Base_Start_IT(&htim2); // Start debounce timer
+    } else {
+        __NOP();
+    }
+}
+
+/**
+  * @brief  Period elapsed callback in non-blocking mode
+  * @param  htim TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if(htim->Instance == TIM2) {
+        if(HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_RESET) {
+            pb_state = 0;
+        } else {
+            pb_state = 1;
+            pb_toggle ^= pb_state;
+            HAL_GPIO_WritePin(LD1_GPIO_Port,LD1_Pin,GPIO_PIN_RESET);
+        }
+
+        HAL_TIM_Base_Stop_IT(&htim2); // Stop debounce timer
+    }
+}
+
 
 /**
   * @brief  The application entry point.
@@ -25,16 +67,26 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART3_UART_Init();
+  MX_TIM2_Init();
+
+  /* Initialize printf UART redirect */
   RetargetInit(&huart3);
 
   printf("Welcome to blinky.\r\n");
+  /* Output clock speeds of the MCU */
+  printf("HCLK=%lu Hz\r\n",HAL_RCC_GetHCLKFreq());
+  printf("PCLK1=%lu Hz\r\n",HAL_RCC_GetPCLK1Freq());
+  printf("PCLK2=%lu Hz\r\n",HAL_RCC_GetPCLK2Freq());
+  printf("SYSCLK=%lu Hz\r\n",HAL_RCC_GetSysClockFreq());
+
   /* Infinite loop */
   while (1)
   {
-      if(pb_status)
+      if(pb_toggle) {
           HAL_GPIO_WritePin(USER_Btn_GPIO_Port,USER_Btn_Pin,GPIO_PIN_RESET);
-      else
+      } else {
           HAL_GPIO_TogglePin(LD1_GPIO_Port,LD1_Pin);
+      }
 
       HAL_Delay(100);
   }
@@ -141,21 +193,67 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  GPIO_InitStruct.Pin = GPIO_PIN_11;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
 }
 
+
 /**
-  * @brief  EXTI line detection callbacks.
-  * @param  GPIO_Pin Specifies the pins connected EXTI line
+  * @brief TIM2 Initialization Function
+  * @param None
   * @retval None
   */
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+static void MX_TIM2_Init(void)
 {
-    // Making sure interrupt is coming from the GPIO_PIN_13 (our push button)
-    if(GPIO_Pin == GPIO_PIN_13) {
-        pb_status ^= 1; // Toggle the push button status flag
+    __HAL_RCC_TIM2_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+
+    TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+    TIM_MasterConfigTypeDef sMasterConfig = {0};
+    TIM_OC_InitTypeDef sConfigOC = {0};
+
+    htim2.Instance = TIM2;
+    htim2.Init.Prescaler = 42;
+    htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim2.Init.Period = 50000;
+    htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+    if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+    {
+        Error_Handler();
+    }
+    sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+    if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+    {
+        Error_Handler();
+    }
+    if (HAL_TIM_OC_Init(&htim2) != HAL_OK)
+    {
+        Error_Handler();
+    }
+    sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+    sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+    if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+    {
+        Error_Handler();
+    }
+    sConfigOC.OCMode = TIM_OCMODE_TIMING;
+    sConfigOC.Pulse = 0;
+    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+    if (HAL_TIM_OC_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
+    {
+        Error_Handler();
     }
 
-    HAL_GPIO_WritePin(LD1_GPIO_Port,LD1_Pin,GPIO_PIN_RESET);
+    HAL_NVIC_SetPriority(TIM2_IRQn, 14, 0);
+    HAL_NVIC_EnableIRQ(TIM2_IRQn);
+
 }
 
 /**
